@@ -13,6 +13,23 @@
 /* Partial rating (had some scores, now missing some — likely a newly-added
    criterion) is the high-attention state — use the accent colour. */
 .adv-rating-btn--partial .adv-rating-btn-badge { background: #ffc107; }
+
+/* The trigger renders the `+` as an SVG icon (see performer-rating-ui.js)
+   so it centres precisely in the pill and inherits the button colour
+   via stroke=currentColor. Size + centre it here so the button works
+   correctly with any theme (the raw SVG has no width/height attrs). */
+.adv-rating-btn-plus {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    margin-left: 2px;
+}
+.adv-rating-btn-plus svg {
+    width: 11px;
+    height: 11px;
+    display: block;
+}
 .adv-rating-btn:hover .adv-rating-btn-badge { background: #000; color: #ffc107; }
 .adv-rating-modal-overlay {
     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.75);

@@ -331,7 +331,20 @@
     function injectTrigger(ratingStars, performerId) {
         const triggerBtn = document.createElement('button');
         triggerBtn.id = 'perf-rating-trigger';
-        triggerBtn.innerHTML = '<span style="color:#ffc107;">★</span>+';
+        // Wrap both glyphs in spans so themes (e.g. Refract) can
+        // target the ★ and + individually. The + is rendered as an
+        // SVG icon (stroke = currentColor) rather than a text glyph
+        // so it centres precisely in the pill and inherits the button
+        // colour without the baseline-alignment offset that a text "+"
+        // suffers from.
+        triggerBtn.innerHTML =
+            '<span class="adv-rating-btn-star" style="color:#ffc107;">★</span>' +
+            '<span class="adv-rating-btn-plus">' +
+                "<svg viewBox='0 0 24 24' fill='none' aria-hidden='true'>" +
+                "<path d='M6 12H18M12 6V18' stroke='currentColor' " +
+                    "stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/>" +
+                "</svg>" +
+            '</span>';
         triggerBtn.title = "Open Performer Ratings";
         triggerBtn.className = 'adv-rating-btn';
         ratingStars.insertAdjacentElement('afterend', triggerBtn);
