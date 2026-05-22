@@ -290,6 +290,49 @@
         };
     }
 
+    function computeBreakdownFromCustomFields(customFields, groups, criteria, ratingPrecision, cfPrefix) {
+        const scoresByCriterion = {};
+        for (const c of criteria) {
+            const val = customFields[cfPrefix + c.name];
+            if (val !== null && val !== undefined) {
+                const s = parseInt(val, 10);
+                if (!isNaN(s) && s !== 0) scoresByCriterion[c.id] = s;
+            }
+        }
+        const groupRows = groups.map(g => {
+            const groupCriteria = criteria.filter(c => c.group === g.id);
+            const ratedCriteria = groupCriteria.filter(c => scoresByCriterion[c.id] !== undefined);
+            const totalWeight = ratedCriteria.reduce((n, c) => n + (parseFloat(c.weight) || 0), 0);
+            const weightedSum = ratedCriteria.reduce((n, c) => n + (scoresByCriterion[c.id] || 0) * (parseFloat(c.weight) || 0), 0);
+            const avg = totalWeight > 0 ? weightedSum / totalWeight : null;
+            return {
+                group: g,
+                criteriaInGroup: groupCriteria,
+                rated: ratedCriteria,
+                unrated: groupCriteria.filter(c => scoresByCriterion[c.id] === undefined),
+                totalWeight, weightedSum, avg, scoresByCriterion,
+            };
+        });
+        const contributingGroups = groupRows.filter(r => r.avg !== null && (parseFloat(r.group.weight) || 0) > 0);
+        const totalGroupWeight = contributingGroups.reduce((n, r) => n + (parseFloat(r.group.weight) || 0), 0);
+        const finalAvg = totalGroupWeight > 0
+            ? contributingGroups.reduce((n, r) => n + r.avg * (parseFloat(r.group.weight) || 0), 0) / totalGroupWeight
+            : null;
+        let rating100 = null;
+        if (finalAvg !== null) {
+            const precision = Math.max(1, parseInt(ratingPrecision, 10) || 10);
+            rating100 = Math.round(Math.round(finalAvg * 20 / precision) * precision);
+            rating100 = Math.max(precision, Math.min(100, rating100));
+        }
+        const totalCriteria = criteria.length;
+        const totalRated = Object.keys(scoresByCriterion).length;
+        return {
+            groupRows, contributingGroups, totalGroupWeight, finalAvg, rating100,
+            totalCriteria, totalRated, totalUnrated: totalCriteria - totalRated,
+            scoresByCriterion,
+        };
+    }
+
     async function getPerformerTags(performerId) {
         const query = `query FindPerformer($id: ID!) { findPerformer(id: $id) { id tags { id name } } }`;
         const res = await gqlClient(query, { id: performerId });
@@ -408,12 +451,20 @@
 
     async function annotateUnratedCount(triggerBtn, performerId) {
         try {
-            const [{ groups, criteria }, performerTags] = await Promise.all([
-                getRatingModel(),
-                getPerformerTags(performerId),
+            const config = await getPluginConfig();
+            const useCF = coerceBool(config.use_custom_fields, false);
+            const cfPrefix = config.custom_field_prefix || "";
+            const groups = groupsFromConfig(config);
+            const criteria = criteriaFromConfig(config, groups).filter(c => c.enabled);
+            const precision = await getStashRatingPrecision();
+            const [performerTags, customFields] = await Promise.all([
+                useCF ? Promise.resolve([]) : getPerformerTags(performerId),
+                useCF ? getPerformerCustomFields(performerId) : Promise.resolve({}),
             ]);
             if (!triggerBtn.isConnected) return;
-            const breakdown = computeBreakdown(performerTags, groups, criteria, 10);
+            const breakdown = useCF
+                ? computeBreakdownFromCustomFields(customFields, groups, criteria, precision, cfPrefix)
+                : computeBreakdown(performerTags, groups, criteria, 10);
             // No badge when fully rated.
             if (breakdown.totalUnrated === 0) {
                 triggerBtn.title = "Open Performer Ratings — all criteria rated";
@@ -906,24 +957,28 @@
                     }
                     await configurePlugin(configInput);
 
-                    // Auto-rename any tags whose criterion was renamed
+                    const useCF = general && coerceBool(configInput.use_custom_fields, false);
                     let renameSummary = "";
-                    if (renames.length) {
-                        let renamedCount = 0;
-                        for (const rn of renames) {
-                            const result = await renameRatingTags(rn.from, rn.to);
-                            if (result.renamedAny) renamedCount++;
+                    let createSummary = "";
+                    if (!useCF) {
+                        // Auto-rename any tags whose criterion was renamed
+                        if (renames.length) {
+                            let renamedCount = 0;
+                            for (const rn of renames) {
+                                const result = await renameRatingTags(rn.from, rn.to);
+                                if (result.renamedAny) renamedCount++;
+                            }
+                            if (renamedCount) renameSummary = " Renamed " + renamedCount + " tag group(s).";
                         }
-                        if (renamedCount) renameSummary = " Renamed " + renamedCount + " tag group(s).";
-                    }
 
-                    // Auto-create any missing tags for enabled criteria
-                    const created = await createMissingTags(criteria);
-                    const createPieces = [];
-                    if (created.createdParent) createPieces.push("parent tag");
-                    if (created.createdCategories) createPieces.push(created.createdCategories + " criterion tag(s)");
-                    if (created.createdLevels) createPieces.push(created.createdLevels + " level tag(s)");
-                    const createSummary = createPieces.length ? " Created " + createPieces.join(", ") + "." : "";
+                        // Auto-create any missing tags for enabled criteria
+                        const created = await createMissingTags(criteria);
+                        const createPieces = [];
+                        if (created.createdParent) createPieces.push("parent tag");
+                        if (created.createdCategories) createPieces.push(created.createdCategories + " criterion tag(s)");
+                        if (created.createdLevels) createPieces.push(created.createdLevels + " level tag(s)");
+                        createSummary = createPieces.length ? " Created " + createPieces.join(", ") + "." : "";
+                    }
 
                     setSavingState({ saving: false, message: "Saved." + renameSummary + createSummary, kind: "success" });
                 } catch (e) {
