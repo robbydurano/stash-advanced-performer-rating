@@ -1,7 +1,7 @@
 name: Advanced Performer Rating
-description: Calculates performer ratings from category-based tags. Configure criteria, weights, and names in the plugin settings panel.
+description: Calculates performer ratings from category-based custom fields. Configure criteria, weights, and names in the plugin settings panel.
 version: 2.4.0
-url: https://github.com/ordureconnoisseur/stash-advanced-performer-rating
+url: https://github.com/robbydurano/stash-advanced-performer-rating
 exec:
   - python
   - "{pluginDir}/advancedPerformerRating.py"
@@ -12,10 +12,6 @@ ui:
   css:
     - performer-rating-ui.css
 settings:
-  use_custom_fields:
-    displayName: "Use Custom Fields"
-    description: "Read scores from performer custom fields instead of tags. Field key = optional prefix + criterion name (e.g. 'Face')."
-    type: BOOLEAN
   custom_field_prefix:
     displayName: "Custom Field Prefix"
     description: "Optional prefix for custom field keys (e.g. 'rating_' makes keys like 'rating_Face'). Leave blank to use criterion names as-is."
@@ -31,18 +27,6 @@ tasks:
     description: Recalculate ratings for all performers
     defaultArgs:
       mode: process_performers
-  - name: Create Tags
-    description: Generate required rating tags
-    defaultArgs:
-      mode: create_tags
-  - name: Remove Tags
-    description: Remove all plugin-generated tags (requires Allow Destructive Actions)
-    defaultArgs:
-      mode: remove_tags
-  - name: Migrate Tag Ratings to Custom Fields
-    description: Read tag-based scores and write them as custom fields on each performer
-    defaultArgs:
-      mode: migrate_to_custom_fields
   - name: Initialize Custom Fields
     description: Set all criterion custom fields to 0 on performers that don't have them yet
     defaultArgs:
