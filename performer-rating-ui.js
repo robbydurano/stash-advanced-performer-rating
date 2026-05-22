@@ -745,6 +745,8 @@
                         setCriteria(criteriaFromConfig(cfg, gs));
                         setGeneral({
                             allow_destructive_actions: coerceBool(cfg.allow_destructive_actions, false),
+                            use_custom_fields: coerceBool(cfg.use_custom_fields, false),
+                            custom_field_prefix: cfg.custom_field_prefix || "",
                             rating_precision: info.precision,
                             rating_precision_label: info.label,
                         });
@@ -954,10 +956,12 @@
                     const configInput = configFromState(groups, criteria);
                     if (general) {
                         configInput.allow_destructive_actions = !!general.allow_destructive_actions;
+                        configInput.use_custom_fields = !!general.use_custom_fields;
+                        configInput.custom_field_prefix = general.custom_field_prefix || "";
                     }
                     await configurePlugin(configInput);
 
-                    const useCF = general && coerceBool(configInput.use_custom_fields, false);
+                    const useCF = general && !!general.use_custom_fields;
                     let renameSummary = "";
                     let createSummary = "";
                     if (!useCF) {
@@ -1163,6 +1167,37 @@
                     R.createElement("div", { className: "apr-general-control" },
                         R.createElement("span", { className: "apr-readonly" },
                             general.rating_precision_label + " (" + general.rating_precision + ")"))),
+                R.createElement("div", { key: "g-cf", className: "setting" },
+                    R.createElement("div", null,
+                        R.createElement("h3", null, "Use Custom Fields"),
+                        R.createElement("div", { className: "sub-heading" },
+                            "Read and write scores from performer custom fields instead of tags. Field key = optional prefix + criterion name (e.g. \"Face\").")),
+                    R.createElement("div", { className: "apr-general-control" },
+                        R.createElement("div", { className: "custom-control custom-switch" },
+                            R.createElement("input", {
+                                type: "checkbox",
+                                className: "custom-control-input",
+                                id: "apr-use-cf",
+                                checked: !!general.use_custom_fields,
+                                onChange: function (e) { updateGeneral({ use_custom_fields: e.target.checked }); },
+                            }),
+                            R.createElement("label", {
+                                className: "custom-control-label",
+                                htmlFor: "apr-use-cf",
+                            })))),
+                R.createElement("div", { key: "g-cf-prefix", className: "setting" },
+                    R.createElement("div", null,
+                        R.createElement("h3", null, "Custom Field Prefix"),
+                        R.createElement("div", { className: "sub-heading" },
+                            "Optional prefix for custom field keys (e.g. \"rating_\" → \"rating_Face\"). Leave blank to use criterion names as-is.")),
+                    R.createElement("div", { className: "apr-general-control" },
+                        R.createElement("input", {
+                            type: "text",
+                            className: "form-control",
+                            value: general.custom_field_prefix,
+                            placeholder: "e.g. rating_",
+                            onChange: function (e) { updateGeneral({ custom_field_prefix: e.target.value }); },
+                        }))),
                 R.createElement("div", { key: "g-destr", className: "setting" },
                     R.createElement("div", null,
                         R.createElement("h3", null, "Allow Destructive Actions"),
